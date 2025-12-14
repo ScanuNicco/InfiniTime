@@ -1,16 +1,8 @@
 #include "displayapp/InfiniTimeTheme.h"
+#include <libraries/log/nrf_log.h>
 #include "components/fs/FS.h"
 #include <algorithm>
-#include <cstdlib>
 #include <cstring>
-#include <cstdio>
-
-#ifdef NRF_LOG_ENABLED
-  #include <libraries/log/nrf_log.h>
-  #define THEME_LOG(fmt, ...) NRF_LOG_INFO(fmt, ##__VA_ARGS__)
-#else
-  #define THEME_LOG(fmt, ...) printf("Theme: " fmt "\n", ##__VA_ARGS__)
-#endif
 
 // Replace LV_DPX with a constexpr version using a constant LV_DPI
 #undef LV_DPX
@@ -31,23 +23,21 @@ namespace {
     if (!hexStr || std::strlen(hexStr) < 6) {
       return defaultColor;
     }
-    
+
     char* endptr;
     uint32_t value = std::strtoul(hexStr, &endptr, 16);
-    
+
     // Check if conversion was successful and we consumed all characters
     if (endptr == hexStr || *endptr != '\0' || value > 0xFFFFFF) {
       return defaultColor;
     }
-    
+
     uint8_t r = (value >> 16) & 0xFF;
     uint8_t g = (value >> 8) & 0xFF;
     uint8_t b = value & 0xFF;
-    
+
     lv_color_t result = LV_COLOR_MAKE(r, g, b);
-    THEME_LOG("parseHexColor: input='%s' -> 0x%06X -> RGB(%02X,%02X,%02X) -> 0x%06X", 
-              hexStr, value, r, g, b, result.full);
-    
+
     return result;
   }
 
@@ -64,7 +54,7 @@ namespace {
     if (*line == '#' || *line == '\0' || *line == '\n' || *line == '\r') {
       return false;
     }
-    
+
     // Parse key
     size_t keyLen = 0;
     while (*line != '=' && *line != '\0' && *line != '\n' && keyLen < maxKeyLen - 1) {
@@ -76,31 +66,31 @@ namespace {
         key[keyLen++] = c;
       }
     }
-    
+
     // Trim trailing whitespace from key
     while (keyLen > 0 && (key[keyLen - 1] == ' ' || key[keyLen - 1] == '\t')) {
       keyLen--;
     }
-    
+
     key[keyLen] = '\0';
-    
+
     if (*line != '=' || keyLen == 0) {
       return false;
     }
     line++; // Skip '='
-    
+
     // Skip leading whitespace in value
     while (*line == ' ' || *line == '\t') {
       line++;
     }
-    
+
     // Parse value
     size_t valueLen = 0;
     while (*line != '\0' && *line != '\n' && *line != '\r' && valueLen < maxValueLen - 1) {
       value[valueLen++] = *line++;
     }
     value[valueLen] = '\0';
-    
+
     return true;
   }
 
@@ -117,14 +107,12 @@ namespace {
    */
   void loadThemeConfig(Pinetime::Controllers::FS* filesystem) {
     if (!filesystem) {
-      THEME_LOG("loadThemeConfig: No filesystem provided");
       return;
     }
 
-    THEME_LOG("loadThemeConfig: Attempting to open /themes/theme.cfg");
     lfs_file_t file;
     if (filesystem->FileOpen(&file, "/themes/theme.cfg", LFS_O_RDONLY) != LFS_ERR_OK) {
-      THEME_LOG("loadThemeConfig: Failed to open /themes/theme.cfg");
+      NRF_LOG_INFO("loadThemeConfig: Failed to open /themes/theme.cfg");
       return;
     }
 
@@ -184,18 +172,7 @@ namespace {
 
       lineStart = lineEnd + 1; // Skip the newline character
     }
-    
-    // Log color summary
-    THEME_LOG("=== Color Configuration Summary (Hex Values) ===");
-    THEME_LOG("accent_light         = 0x%06X", Colors::accent_light.full);
-    THEME_LOG("accent      = 0x%06X", Colors::accent.full);
-    THEME_LOG("accent_dark     = 0x%06X", Colors::accent_dark.full);
-    THEME_LOG("highlight  = 0x%06X", Colors::highlight.full);
-    THEME_LOG("text_primary    = 0x%06X", Colors::text_primary.full);
-    THEME_LOG("text_header  = 0x%06X", Colors::text_header.full);
-    THEME_LOG("page_bg    = 0x%06X", Colors::page_bg.full);
-    THEME_LOG("icon  = 0x%06X", Colors::icon.full);
-}
+  }
 }
 
 static Pinetime::Controllers::FS* themeFilesystem = nullptr;
@@ -205,10 +182,10 @@ static void refresh_object_tree(lv_obj_t* obj) {
   if (obj == nullptr) {
     return;
   }
-  
+
   // Refresh this object
   lv_obj_refresh_style(obj, LV_OBJ_PART_ALL, LV_STYLE_PROP_ALL);
-  
+
   // Recursively refresh all children
   lv_obj_t* child = lv_obj_get_child(obj, nullptr);
   while (child != nullptr) {
@@ -413,21 +390,13 @@ static void basic_init() {
  * @return a pointer to reference this theme later
  */
 lv_theme_t* lv_pinetime_theme_init(Pinetime::Controllers::FS* filesystem) {
-  THEME_LOG("=== lv_pinetime_theme_init() called ===");
-  
+
   // Set the filesystem pointer if provided
   if (filesystem != nullptr) {
-    THEME_LOG("Filesystem provided, loading custom theme config");
     themeFilesystem = filesystem;
     loadThemeConfig(filesystem);
-  } else {
-    THEME_LOG("No filesystem provided, using default colors");
   }
 
-  THEME_LOG("=== Initializing theme with colors ===");
-  THEME_LOG("primary    = 0x%06X", Colors::text_primary.full);
-  THEME_LOG("secondary  = 0x%06X", Colors::text_header.full);
-  
   theme.color_primary = Colors::text_primary;
   theme.color_secondary = Colors::text_header;
   theme.font_small = &jetbrains_mono_bold_20;
@@ -446,81 +415,32 @@ lv_theme_t* lv_pinetime_theme_init(Pinetime::Controllers::FS* filesystem) {
 }
 
 void lv_pinetime_theme_set_filesystem(Pinetime::Controllers::FS* filesystem) {
-  THEME_LOG("lv_pinetime_theme_set_filesystem() called with filesystem=%p", (void*)filesystem);
-  if (filesystem == nullptr) {
-    THEME_LOG("lv_pinetime_theme_set_filesystem() called with NULL");
-  } else {
-    THEME_LOG("lv_pinetime_theme_set_filesystem() called with valid filesystem pointer");
-  }
+
   themeFilesystem = filesystem;
-  THEME_LOG("themeFilesystem set to %p", (void*)themeFilesystem);
-  
+
   // If theme was already initialized and we now have a filesystem, try to reload colors
   if (inited && filesystem != nullptr) {
-    THEME_LOG("Theme already initialized, attempting to load config now");
     loadThemeConfig(filesystem);
   }
 }
 
 void lv_pinetime_theme_reload_config() {
-  THEME_LOG("lv_pinetime_theme_reload_config() called");
   if (themeFilesystem != nullptr) {
-    THEME_LOG("Attempting to reload theme config from filesystem");
     loadThemeConfig(themeFilesystem);
-    
+
     // Update the theme struct with new colors
-    THEME_LOG("Updating theme colors: primary=0x%06X secondary=0x%06X", 
-              Colors::text_primary.full, Colors::text_header.full);
     theme.color_primary = Colors::text_primary;
     theme.color_secondary = Colors::text_header;
-    
+
     // Reinitialize the theme styles with the new colors
-    THEME_LOG("Reinitializing theme styles with new colors");
     basic_init();
-    
+
     // Refresh all objects on screen to apply the new styles
     lv_obj_t* scr = lv_scr_act();
     if (scr != nullptr) {
-      THEME_LOG("Refreshing screen and all child objects recursively");
       refresh_object_tree(scr);
       lv_obj_invalidate(scr);
     }
-  } else {
-    THEME_LOG("Cannot reload config: themeFilesystem is NULL");
-  }
-}
-
-void lv_pinetime_theme_test_filesystem() {
-  THEME_LOG("=== Theme Filesystem Diagnostic Test ===");
-  THEME_LOG("themeFilesystem pointer: %p", (void*)themeFilesystem);
-  
-  if (themeFilesystem == nullptr) {
-    THEME_LOG("ERROR: themeFilesystem is NULL, cannot test");
-    return;
-  }
-  
-  THEME_LOG("Filesystem pointer is valid, attempting to open /themes/theme.cfg");
-  lfs_file_t file;
-  int openResult = themeFilesystem->FileOpen(&file, "/themes/theme.cfg", LFS_O_RDONLY);
-  THEME_LOG("FileOpen result: %d (0=success, negative=error)", openResult);
-  
-  if (openResult != LFS_ERR_OK) {
-    THEME_LOG("Failed to open file, trying to list /themes directory");
-    // Try to read directory structure
-    lfs_dir_t dir;
-    if (themeFilesystem->DirOpen("/themes", &dir) == LFS_ERR_OK) {
-      THEME_LOG("Successfully opened /themes directory");
-      lfs_info info;
-      while (themeFilesystem->DirRead(&dir, &info) > 0) {
-        THEME_LOG("  - %s (type: %d)", info.name, info.type);
-      }
-      themeFilesystem->DirClose(&dir);
-    } else {
-      THEME_LOG("/themes directory does not exist");
-    }
-  } else {
-    THEME_LOG("Successfully opened /themes/theme.cfg");
-    themeFilesystem->FileClose(&file);
   }
 }
 

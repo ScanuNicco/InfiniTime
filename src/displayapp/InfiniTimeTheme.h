@@ -47,12 +47,6 @@ void lv_pinetime_theme_set_filesystem(Pinetime::Controllers::FS* filesystem);
 void lv_pinetime_theme_reload_config();
 
 /**
- * Test if the theme can access the filesystem and config file
- * Useful for debugging filesystem/theme loading issues
- */
-void lv_pinetime_theme_test_filesystem();
-
-/**
  * Check if a custom theme is currently loaded from the filesystem
  * Returns true if filesystem is set and theme.cfg file exists and was loaded
  * Returns false if using built-in colors
